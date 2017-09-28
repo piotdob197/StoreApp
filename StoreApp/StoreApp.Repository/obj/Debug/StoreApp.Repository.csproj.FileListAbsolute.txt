@@ -49,6 +49,12 @@ C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\bin\System.W
 C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\bin\System.Web.WebPages.xml
 C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\bin\System.Web.WebPages.Deployment.xml
 C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\bin\System.Web.WebPages.Razor.xml
-C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\obj\Debug\StoreApp.Repository.csprojResolveAssemblyReference.cache
 C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\obj\Debug\StoreApp.Repository.dll
 C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\obj\Debug\StoreApp.Repository.pdb
+C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\obj\Debug\StoreApp.Repository.csprojResolveAssemblyReference.cache
+C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\bin\Microsoft.Owin.dll
+C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\bin\Owin.dll
+C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\bin\Microsoft.Owin.xml
+C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\bin\pl\Microsoft.AspNet.Identity.Core.resources.dll
+C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\obj\Debug\StoreApp.Repository.Migrations.Startowa.resources
+C:\Users\Piotrek\Source\Repos\StoreApp\StoreApp\StoreApp.Repository\obj\Debug\StoreApp.Repository.csproj.GenerateResource.Cache

@@ -1,14 +1,18 @@
 ﻿using System;
 using System.Globalization;
 using System.Linq;
+using System.Net.Mail;
 using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Mvc;
+using System.Web.Security;
 using Microsoft.AspNet.Identity;
 using Microsoft.AspNet.Identity.Owin;
 using Microsoft.Owin.Security;
 using StoreApp.Models;
+using StoreApp.Repository.Interfaces;
 using StoreApp.Repository.Models;
 
 namespace StoreApp.Controllers
@@ -17,16 +21,19 @@ namespace StoreApp.Controllers
     public class AccountController : Controller
     {
         private ApplicationSignInManager _signInManager;
-        private ApplicationUserManager _userManager;
+        private UserManager _userManager;
+        private IStoreAppRepo _repository;
 
-        public AccountController()
+        public AccountController(IStoreAppRepo repository)
         {
+            _repository = repository;
         }
 
-        public AccountController(ApplicationUserManager userManager, ApplicationSignInManager signInManager )
+        public AccountController(UserManager userManager, ApplicationSignInManager signInManager, IStoreAppRepo repository)
         {
             UserManager = userManager;
             SignInManager = signInManager;
+            _repository = repository;
         }
 
         public ApplicationSignInManager SignInManager
@@ -35,17 +42,17 @@ namespace StoreApp.Controllers
             {
                 return _signInManager ?? HttpContext.GetOwinContext().Get<ApplicationSignInManager>();
             }
-            private set 
-            { 
-                _signInManager = value; 
+            private set
+            {
+                _signInManager = value;
             }
         }
 
-        public ApplicationUserManager UserManager
+        public UserManager UserManager
         {
             get
             {
-                return _userManager ?? HttpContext.GetOwinContext().GetUserManager<ApplicationUserManager>();
+                return _userManager ?? HttpContext.GetOwinContext().GetUserManager<UserManager>();
             }
             private set
             {
@@ -73,21 +80,29 @@ namespace StoreApp.Controllers
             {
                 return View(model);
             }
+            var user = await UserManager.FindByEmailAsync(model.UserName) ?? await UserManager.FindByNameAsync(model.UserName);
 
-            // This doesn't count login failures towards account lockout
-            // To enable password failures to trigger account lockout, change to shouldLockout: true
-            var result = await SignInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, shouldLockout: false);
+            if (user == null)
+            {
+                ModelState.AddModelError("", "Nieprawidłowe dane logowania");
+                return View(model);
+            }
+
+
+            var result = await SignInManager.PasswordSignInAsync(user.UserName, model.Password, model.RememberMe, shouldLockout: false);
+
             switch (result)
             {
                 case SignInStatus.Success:
+                    if (!user.EmailConfirmed)
+                        return RedirectToAction("Confirm", "Account", new { email = user.Email });
                     return RedirectToLocal(returnUrl);
                 case SignInStatus.LockedOut:
                     return View("Lockout");
                 case SignInStatus.RequiresVerification:
                     return RedirectToAction("SendCode", new { ReturnUrl = returnUrl, RememberMe = model.RememberMe });
-                case SignInStatus.Failure:
                 default:
-                    ModelState.AddModelError("", "Invalid login attempt.");
+                    ModelState.AddModelError("", "Nieprawidłowe dane logowania");
                     return View(model);
             }
         }
@@ -121,7 +136,7 @@ namespace StoreApp.Controllers
             // If a user enters incorrect codes for a specified amount of time then the user account 
             // will be locked out for a specified amount of time. 
             // You can configure the account lockout settings in IdentityConfig
-            var result = await SignInManager.TwoFactorSignInAsync(model.Provider, model.Code, isPersistent:  model.RememberMe, rememberBrowser: model.RememberBrowser);
+            var result = await SignInManager.TwoFactorSignInAsync(model.Provider, model.Code, isPersistent: model.RememberMe, rememberBrowser: model.RememberBrowser);
             switch (result)
             {
                 case SignInStatus.Success:
@@ -143,6 +158,27 @@ namespace StoreApp.Controllers
             return View();
         }
 
+        private void SendEmail(string email, string emailBody, string emailSubject)
+        {
+            var message = new MailMessage("storeappmanager@gmail.com", email)
+            {
+                Subject = emailSubject,
+                Body = emailBody,
+                BodyEncoding = Encoding.UTF8,
+                IsBodyHtml = true
+            };
+            var basicCredential1 = new
+                System.Net.NetworkCredential("storeappmanager@gmail.com", "StoreAppTest");
+
+            var client = new SmtpClient("smtp.gmail.com", 587)
+            {
+                EnableSsl = true,
+                UseDefaultCredentials = false,
+                Credentials = basicCredential1
+            };
+
+            client.Send(message);
+        }
         //
         // POST: /Account/Register
         [HttpPost]
@@ -150,39 +186,43 @@ namespace StoreApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> Register(RegisterViewModel model)
         {
-            if (ModelState.IsValid)
+            if (!ModelState.IsValid) return View(model);
+
+
+            var user = new UserModel { UserName = model.UserName, Email = model.Email, EmailConfirmed = false };
+            var result = await UserManager.CreateAsync(user, model.Password);
+            if (result.Succeeded)
             {
-                var user = new UserModel { UserName = model.Email, Email = model.Email };
-                var result = await UserManager.CreateAsync(user, model.Password);
-                if (result.Succeeded)
-                {
-                    await SignInManager.SignInAsync(user, isPersistent:false, rememberBrowser:false);
-                    
-                    // For more information on how to enable account confirmation and password reset please visit http://go.microsoft.com/fwlink/?LinkID=320771
-                    // Send an email with this link
-                    // string code = await UserManager.GenerateEmailConfirmationTokenAsync(user.Id);
-                    // var callbackUrl = Url.Action("ConfirmEmail", "Account", new { userId = user.Id, code = code }, protocol: Request.Url.Scheme);
-                    // await UserManager.SendEmailAsync(user.Id, "Confirm your account", "Please confirm your account by clicking <a href=\"" + callbackUrl + "\">here</a>");
+                var confirmationToken = UserManager.GenerateEmailConfirmationTokenAsync(user.Id).Result;
+                var emailBody =
+                    $"Witaj {user.UserName}, Dziękujemy za rejestrację, proszę kliknąć w link poniżej aby zakończycz rejestracje na portalu StoreApp shop." + Environment.NewLine +
+                    $"Naciśnij <a href='{Url.Action("ConfirmEmail", "Account", new { token = confirmationToken, userId = user.Id }, Request?.Url?.Scheme)}'>tutaj</a> aby potwierdzić e-mail";
+                var emailSubject = "Potwierdzenie rejestracji na StoreApp shop";
 
-                    return RedirectToAction("Index", "Home");
-                }
-                AddErrors(result);
+                SendEmail(user.Email, emailBody, emailSubject);
+                return RedirectToAction("Confirm", "Account", new { email = model.Email });
             }
+            AddErrors(result);
 
-            // If we got this far, something failed, redisplay form
             return View(model);
+        }
+
+        [AllowAnonymous]
+        public ActionResult Confirm(string email)
+        {
+            ViewBag.Email = email; return View();
         }
 
         //
         // GET: /Account/ConfirmEmail
         [AllowAnonymous]
-        public async Task<ActionResult> ConfirmEmail(string userId, string code)
+        public async Task<ActionResult> ConfirmEmail(string token, string userId)
         {
-            if (userId == null || code == null)
+            if (token == null || userId == null)
             {
                 return View("Error");
             }
-            var result = await UserManager.ConfirmEmailAsync(userId, code);
+            var result = await UserManager.ConfirmEmailAsync(userId, token);
             return View(result.Succeeded ? "ConfirmEmail" : "Error");
         }
 
@@ -404,6 +444,18 @@ namespace StoreApp.Controllers
             return View();
         }
 
+
+        private bool CheckIfUserNameIsUnique(string userName)
+        {
+            var user = Membership.GetUser(userName);
+            return user == null;
+        }
+        private bool CheckIfEmailIsUnique(string email)
+        {
+            var user = Membership.GetUserNameByEmail(email);
+            return user == null;
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
@@ -438,6 +490,7 @@ namespace StoreApp.Controllers
 
         private void AddErrors(IdentityResult result)
         {
+
             foreach (var error in result.Errors)
             {
                 ModelState.AddModelError("", error);
